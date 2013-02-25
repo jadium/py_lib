@@ -7,15 +7,7 @@ import hashlib
 import re
 class ParserFieldError(Exception): pass
 class ParseField(object):
-    '''
-    classdocs
-    '''
-
-
     def __init__(self,regex, name):
-        '''
-        Constructor
-        '''
         self.regex = re.compile(regex)
         self.name = name
         self.data = {}
@@ -24,16 +16,17 @@ class ParseField(object):
         self.size = 0
         self.pop_count = 0
         self.trash_list = []
+        self.entry = ""
         
-    def __set__(self, parser_input):
+    def __setattr__(self, name, value):
+        record_hash = self.md5(value).hexdigest()
         try:
-            record_hash = self.md5(parser_input).hexdigest()
             # we add the group to the dictionary prior to appending 
             # to the records list, if error is raised due to invalid 
             # input, exception will be raised before appending to list
             # this prevents additions to the list that aren't in the dict
             if record_hash not in self.records:
-                self.data[record_hash] = re.search(self.regex, parser_input).group(1)
+                self.data[record_hash] = re.search(self.regex, value).group(1)
                 self.records.append(record_hash)
                 self.size += 1
                 return
@@ -42,10 +35,23 @@ class ParseField(object):
         except:
             self.trash_list.append(record_hash)
     
-    def __get__(self):
+    def __getattribute__(self, name):
+        if name == 'item':
+            record = self.records.pop()
+            self.size -= 1
+            entry = self.data[record]
+            del self.data[record]
+            return entry
+            
+    def __getattr__(self, name):
+        raise AttributeError("%s does not exist"%name)
+    
+    def pop(self):
         try:
             key = self.records.pop()
-            return (key, self.data[key])
+            value = self.data[key]
+            del self.data[key]
+            return (key, value)
         except:
             raise ParserFieldError("no such key found in %s"%self.name)
     
